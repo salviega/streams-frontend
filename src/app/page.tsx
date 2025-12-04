@@ -5,9 +5,9 @@ import Navbar from './shared/Navbar'
 
 export default function Page(): JSX.Element {
 	return (
-		<div className="min-h-screen w-full flex flex-col items-center justify-center">
+		<div className="h-screen w-full flex flex-col items-center">
 			<Navbar />
-			<div className="h-full w-full max-w-3xl flex flex-1">
+			<div className="w-4/5 flex flex-col items-center justify-start p-6">
 				<Home />
 			</div>
 		</div>
