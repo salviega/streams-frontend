@@ -11,10 +11,15 @@
 		"start": "next start"
 	},
 	"dependencies": {
+		"@tanstack/react-query": "^5.90.12",
+		"lottie-react": "^2.4.1",
 		"next": "16.0.7",
 		"react": "19.2.1",
 		"react-dom": "19.2.1",
-		"thirdweb": "^5.115.2"
+		"thirdweb": "^5.115.2",
+		"use-debounce": "^10.0.6",
+		"viem": "^2.41.2",
+		"wagmi": "^3.1.0"
 	},
 	"devDependencies": {
 		"@tailwindcss/postcss": "^4",

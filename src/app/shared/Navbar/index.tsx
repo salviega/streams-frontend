@@ -1,9 +1,16 @@
 'use client'
+
 import { JSX } from 'react'
 
 import { LoginButton } from './_componets/LoginButton'
 
-export default function Navbar(): JSX.Element {
+type Props = {
+	onNewCampaign?: () => void
+}
+
+export default function Navbar(props: Props): JSX.Element {
+	const { onNewCampaign } = props
+
 	return (
 		<div className="navbar bg-base-100 shadow-sm">
 			<div className="navbar-start">
@@ -30,14 +37,8 @@ export default function Navbar(): JSX.Element {
 						className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow"
 					>
 						<li>
-							<button>➕ New campaign</button>
+							<button onClick={onNewCampaign}>➕ New campaign</button>
 						</li>
-						{/* <li>
-							<a>Parent</a>
-							<ul className="p-2">
-								<li></li>
-							</ul>
-						</li> */}
 					</ul>
 				</div>
 				<a className="btn btn-ghost text-xl"> Streamer plataform 💦</a>
@@ -45,7 +46,7 @@ export default function Navbar(): JSX.Element {
 			<div className="navbar-center hidden lg:flex">
 				<ul className="menu menu-horizontal px-1">
 					<li>
-						<button>➕ New campaign</button>
+						<button onClick={onNewCampaign}>➕ New campaign</button>
 					</li>
 				</ul>
 			</div>
