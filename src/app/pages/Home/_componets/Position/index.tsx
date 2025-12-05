@@ -2,7 +2,7 @@ import { JSX } from 'react'
 
 import Label from './_componets/Label'
 import Stats from './_componets/Stats'
-import Yield from './_componets/Yield'
+import StreamingRewards from './_componets/StreamingRewards'
 
 export default function Position(): JSX.Element {
 	return (
@@ -10,10 +10,15 @@ export default function Position(): JSX.Element {
 			{/* Campaign Header */}
 			<Label />
 
-			{/* Grid: Position + Timeline */}
-			<div className="grid grid-cols-[1.4fr_1fr] gap-4">
+			{/* Grid: Position + Streaming */}
+			<div className="grid grid-cols-[1fr_1fr] gap-4">
 				<Stats />
-				<Yield />
+				<StreamingRewards
+					rewardSymbol="USDTM"
+					flowRatePerSecond={0.0000084}
+					initialBalance={218.286772}
+					isStreaming={true}
+				/>
 			</div>
 		</div>
 	)
