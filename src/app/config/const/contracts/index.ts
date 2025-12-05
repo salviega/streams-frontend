@@ -7,6 +7,10 @@ export const STREAMER_ADDRESS: Address =
 export const STREAMER_HOOK_ADDRESS: Address =
 	'0xdf128f75822B36fbca98c302B7011a40CF6cC500'
 
+// Superfluid Addresses (Sepolia)
+export const GDA_FORWARDER_ADDRESS: Address =
+	'0x6DA13Bde224A05a288748d857b9e7DDEffd1dE08'
+
 // Uniswap V4 Tiers
 export const UNISWAP_V4_TIERS = [
 	{ fee: 100, tickSpacing: 1 }, // 0.01%

@@ -5,6 +5,7 @@ import Lottie, { LottieRefCurrentProps } from 'lottie-react'
 import { formatUnits } from 'viem'
 
 import { CampaignWithMeta, useLpPosition } from '@/app/hooks/useCampaigns'
+import { useClaimRewards } from '@/app/hooks/useClaimRewards'
 import Container from '@/app/ui/Container'
 import Typography from '@/app/ui/Typography'
 import { formatAmount, formatSmallNumber, fromWei } from '@/app/utils/format'
@@ -15,11 +16,30 @@ import usdcAnimation from '@/../public/lotties/usdc-earnings.json'
 
 type Props = {
 	campaign: CampaignWithMeta
+	onClaimSuccess?: () => void
 }
 
 export default function StreamingRewards(props: Props): JSX.Element {
-	const { campaign } = props
-	const { position } = useLpPosition(Number(campaign.id))
+	const { campaign, onClaimSuccess } = props
+	const { position, refetch: refetchPosition } = useLpPosition(Number(campaign.id))
+	
+	// Claim hook
+	const { 
+		claim, 
+		reset: resetClaim,
+		status: claimStatus, 
+		error: claimError, 
+		isLoading: isClaimLoading,
+		txHash 
+	} = useClaimRewards(
+		campaign.superToken as `0x${string}`,
+		campaign.distributionPool as `0x${string}`,
+		() => {
+			// Refetch position data after successful claim
+			refetchPosition()
+			onClaimSuccess?.()
+		}
+	)
 
 	// Flow rate per second (Superfluid uses 18 decimals always)
 	const flowRatePerSecond = fromWei(campaign.flowRate, 18)
@@ -39,7 +59,7 @@ export default function StreamingRewards(props: Props): JSX.Element {
 
 	const isStreaming = campaign.active && shareBps > 0
 
-	// Update balance when position changes
+	// Update balance when position changes or after claim
 	useEffect(() => {
 		if (position) {
 			// SuperToken always uses 18 decimals
@@ -47,6 +67,20 @@ export default function StreamingRewards(props: Props): JSX.Element {
 			setBalance(pending)
 		}
 	}, [position])
+
+	// Reset balance after successful claim
+	useEffect(() => {
+		if (claimStatus === 'success') {
+			// Reset to near zero and let it start accumulating again
+			setBalance(0)
+			// Refetch position and reset claim state after a delay
+			const timer = setTimeout(() => {
+				refetchPosition()
+				resetClaim()
+			}, 5000)
+			return () => clearTimeout(timer)
+		}
+	}, [claimStatus, refetchPosition, resetClaim])
 
 	// Animate balance counter
 	useEffect(() => {
@@ -184,11 +218,42 @@ export default function StreamingRewards(props: Props): JSX.Element {
 
 				{/* Claim button */}
 				<button
+					onClick={claim}
 					className="w-full mt-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-green-500 text-white font-semibold hover:from-cyan-600 hover:to-green-600 transition-all duration-200 shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-					disabled={balance <= 0}
+					disabled={balance <= 0 || isClaimLoading}
 				>
-					Claim {formatAmount(balance, 2)} {campaign.rewardSymbol}
+					{isClaimLoading ? (
+						<span className="flex items-center justify-center gap-2">
+							<span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+							{claimStatus === 'connecting' ? 'Connecting to pool...' : 'Claiming...'}
+						</span>
+					) : claimStatus === 'success' ? (
+						<span className="flex items-center justify-center gap-2">
+							✅ Claimed successfully!
+						</span>
+					) : (
+						`Claim ${formatAmount(balance, 2)} ${campaign.rewardSymbol}`
+					)}
 				</button>
+
+				{/* Error message */}
+				{claimError && (
+					<Typography variant="label" className="text-red-400 text-xs text-center">
+						{claimError}
+					</Typography>
+				)}
+
+				{/* TX Hash */}
+				{txHash && (
+					<a 
+						href={`https://sepolia.etherscan.io/tx/${txHash}`}
+						target="_blank"
+						rel="noopener noreferrer"
+						className="text-xs text-cyan-400 hover:underline"
+					>
+						View transaction ↗
+					</a>
+				)}
 
 				{/* Superfluid badge */}
 				<div className="flex items-center gap-2 text-xs text-gray-500">
