@@ -2,52 +2,66 @@
 
 import { JSX, useEffect, useState, useRef } from 'react'
 import Lottie, { LottieRefCurrentProps } from 'lottie-react'
+import { formatUnits } from 'viem'
 
+import { CampaignWithMeta, useLpPosition } from '@/app/hooks/useCampaigns'
 import Container from '@/app/ui/Container'
 import Typography from '@/app/ui/Typography'
+import { formatAmount, formatSmallNumber, fromWei } from '@/app/utils/format'
 
 // Import lotties
 import catAnimation from '@/../public/lotties/loader-cat.json'
 import usdcAnimation from '@/../public/lotties/usdc-earnings.json'
 
 type Props = {
-	rewardSymbol?: string
-	flowRatePerSecond?: number // tokens per second
-	initialBalance?: number
-	isStreaming?: boolean
+	campaign: CampaignWithMeta
 }
 
 export default function StreamingRewards(props: Props): JSX.Element {
-	const {
-		rewardSymbol = 'USDTM',
-		flowRatePerSecond = 0.0000084, // ~$0.73/day
-		initialBalance = 1234.567891,
-		isStreaming = true
-	} = props
+	const { campaign } = props
+	const { position } = useLpPosition(Number(campaign.id))
 
-	const [balance, setBalance] = useState(initialBalance)
+	// Flow rate per second (Superfluid uses 18 decimals always)
+	const flowRatePerSecond = fromWei(campaign.flowRate, 18)
+
+	// User's share (basis points to decimal)
+	const shareBps = position ? Number(position.shareBps) : 0
+	const userFlowRatePerSecond = flowRatePerSecond * (shareBps / 10000)
+
+	// Initial balance from pending rewards - SuperToken always uses 18 decimals
+	const initialPendingReward = position
+		? parseFloat(formatUnits(position.pendingReward, 18))
+		: 0
+
+	const [balance, setBalance] = useState(initialPendingReward)
 	const catRef = useRef<LottieRefCurrentProps>(null)
 	const usdcRef = useRef<LottieRefCurrentProps>(null)
 
+	const isStreaming = campaign.active && shareBps > 0
+
+	// Update balance when position changes
+	useEffect(() => {
+		if (position) {
+			// SuperToken always uses 18 decimals
+			const pending = parseFloat(formatUnits(position.pendingReward, 18))
+			setBalance(pending)
+		}
+	}, [position])
+
 	// Animate balance counter
 	useEffect(() => {
-		if (!isStreaming) return
+		if (!isStreaming || userFlowRatePerSecond <= 0) return
 
 		const interval = setInterval(() => {
-			setBalance(prev => prev + flowRatePerSecond / 10) // Update 10x per second for smooth animation
+			setBalance(prev => prev + userFlowRatePerSecond / 10)
 		}, 100)
 
 		return () => clearInterval(interval)
-	}, [isStreaming, flowRatePerSecond])
+	}, [isStreaming, userFlowRatePerSecond])
 
-	// Format balance with many decimals for streaming effect
-	const formatBalance = (value: number): string => {
-		const [integer, decimal] = value.toFixed(8).split('.')
-		return `${parseInt(integer).toLocaleString()}.${decimal}`
-	}
-
-	// Calculate daily/monthly earnings
-	const dailyEarnings = flowRatePerSecond * 86400
+	// Calculate earnings
+	const hourlyEarnings = userFlowRatePerSecond * 3600
+	const dailyEarnings = userFlowRatePerSecond * 86400
 	const monthlyEarnings = dailyEarnings * 30
 
 	return (
@@ -72,40 +86,40 @@ export default function StreamingRewards(props: Props): JSX.Element {
 
 			{/* Main content */}
 			<div className="relative z-10 flex flex-col items-center gap-6 py-8">
-			{/* Lottie animations container */}
-			<div className="relative flex items-center justify-center h-56">
-				{/* Cat animation - MUCH BIGGER */}
-				<div className="relative z-20 w-72 h-72">
-					<Lottie
-						lottieRef={catRef}
-						animationData={catAnimation}
-						loop={true}
-						autoplay={true}
-						style={{ width: '100%', height: '100%' }}
-					/>
-				</div>
+				{/* Lottie animations container */}
+				<div className="relative flex items-center justify-center h-56">
+					{/* Cat animation */}
+					<div className="relative z-20 w-72 h-72">
+						<Lottie
+							lottieRef={catRef}
+							animationData={catAnimation}
+							loop={true}
+							autoplay={true}
+							style={{ width: '100%', height: '100%' }}
+						/>
+					</div>
 
-				{/* USDC coin - LEFT side of the cat */}
-				<div className="absolute -left-48 top-1/2 -translate-y-1/2 w-[400px] h-[400px] opacity-90">
-					<Lottie
-						lottieRef={usdcRef}
-						animationData={usdcAnimation}
-						loop={true}
-						autoplay={true}
-						style={{ width: '100%', height: '100%' }}
-					/>
-				</div>
+					{/* USDC coin - LEFT side */}
+					<div className="absolute -left-48 top-1/2 -translate-y-1/2 w-[400px] h-[400px] opacity-90">
+						<Lottie
+							lottieRef={usdcRef}
+							animationData={usdcAnimation}
+							loop={true}
+							autoplay={true}
+							style={{ width: '100%', height: '100%' }}
+						/>
+					</div>
 
-				{/* USDC coin - RIGHT side of the cat */}
-				<div className="absolute -right-48 top-1/2 -translate-y-1/2 w-[400px] h-[400px] opacity-90">
-					<Lottie
-						animationData={usdcAnimation}
-						loop={true}
-						autoplay={true}
-						style={{ width: '100%', height: '100%' }}
-					/>
+					{/* USDC coin - RIGHT side */}
+					<div className="absolute -right-48 top-1/2 -translate-y-1/2 w-[400px] h-[400px] opacity-90">
+						<Lottie
+							animationData={usdcAnimation}
+							loop={true}
+							autoplay={true}
+							style={{ width: '100%', height: '100%' }}
+						/>
+					</div>
 				</div>
-			</div>
 
 				{/* Balance counter */}
 				<div className="flex flex-col items-center gap-2">
@@ -115,52 +129,65 @@ export default function StreamingRewards(props: Props): JSX.Element {
 					
 					<div className="flex items-baseline gap-2">
 						<span className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-green-400 font-mono tabular-nums">
-							{formatBalance(balance)}
+							{formatAmount(balance, 4)}
 						</span>
-						<span className="text-xl text-gray-400">{rewardSymbol}</span>
+						<span className="text-xl text-gray-400">{campaign.rewardSymbol}</span>
 					</div>
 
 					{/* Flow rate indicator */}
-					<div className="flex items-center gap-1 text-xs">
-						<span className="text-green-400">+</span>
-						<span className="text-green-400 font-mono">
-							{flowRatePerSecond.toFixed(8)}
-						</span>
-						<span className="text-gray-500">{rewardSymbol}/sec</span>
-					</div>
+					{isStreaming && (
+						<div className="flex items-center gap-1 text-xs">
+							<span className="text-green-400">+</span>
+							<span className="text-green-400 font-mono">
+								{formatSmallNumber(userFlowRatePerSecond)}
+							</span>
+							<span className="text-gray-500">{campaign.rewardSymbol}/sec</span>
+						</div>
+					)}
+
+					{!isStreaming && shareBps === 0 && (
+						<Typography variant="label" className="text-gray-500 text-xs">
+							Add liquidity to start earning
+						</Typography>
+					)}
 				</div>
 
 				{/* Stats row */}
-				<div className="w-full grid grid-cols-3 gap-4 pt-4 border-t border-gray-700/50">
-					<div className="flex flex-col items-center gap-1">
-						<Typography variant="label" className="text-gray-500 text-[10px] uppercase">
-							Per Hour
-						</Typography>
-						<Typography variant="subtitle" className="text-cyan-400 text-sm">
-							+{(flowRatePerSecond * 3600).toFixed(4)}
-						</Typography>
+				{isStreaming && (
+					<div className="w-full grid grid-cols-3 gap-4 pt-4 border-t border-gray-700/50">
+						<div className="flex flex-col items-center gap-1">
+							<Typography variant="label" className="text-gray-500 text-[10px] uppercase">
+								Per Hour
+							</Typography>
+							<Typography variant="subtitle" className="text-cyan-400 text-sm">
+								+{formatAmount(hourlyEarnings, 4)}
+							</Typography>
+						</div>
+						<div className="flex flex-col items-center gap-1">
+							<Typography variant="label" className="text-gray-500 text-[10px] uppercase">
+								Per Day
+							</Typography>
+							<Typography variant="subtitle" className="text-cyan-400 text-sm">
+								+{formatAmount(dailyEarnings, 2)}
+							</Typography>
+						</div>
+						<div className="flex flex-col items-center gap-1">
+							<Typography variant="label" className="text-gray-500 text-[10px] uppercase">
+								Per Month
+							</Typography>
+							<Typography variant="subtitle" className="text-cyan-400 text-sm">
+								+{formatAmount(monthlyEarnings, 2)}
+							</Typography>
+						</div>
 					</div>
-					<div className="flex flex-col items-center gap-1">
-						<Typography variant="label" className="text-gray-500 text-[10px] uppercase">
-							Per Day
-						</Typography>
-						<Typography variant="subtitle" className="text-cyan-400 text-sm">
-							+{dailyEarnings.toFixed(2)}
-						</Typography>
-					</div>
-					<div className="flex flex-col items-center gap-1">
-						<Typography variant="label" className="text-gray-500 text-[10px] uppercase">
-							Per Month
-						</Typography>
-						<Typography variant="subtitle" className="text-cyan-400 text-sm">
-							+{monthlyEarnings.toFixed(2)}
-						</Typography>
-					</div>
-				</div>
+				)}
 
 				{/* Claim button */}
-				<button className="w-full mt-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-green-500 text-white font-semibold hover:from-cyan-600 hover:to-green-600 transition-all duration-200 shadow-lg shadow-cyan-500/20">
-					Claim {balance.toFixed(2)} {rewardSymbol}
+				<button
+					className="w-full mt-2 px-6 py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-green-500 text-white font-semibold hover:from-cyan-600 hover:to-green-600 transition-all duration-200 shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+					disabled={balance <= 0}
+				>
+					Claim {formatAmount(balance, 2)} {campaign.rewardSymbol}
 				</button>
 
 				{/* Superfluid badge */}
@@ -173,4 +200,3 @@ export default function StreamingRewards(props: Props): JSX.Element {
 		</Container>
 	)
 }
-

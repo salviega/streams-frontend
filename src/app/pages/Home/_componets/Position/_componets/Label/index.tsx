@@ -1,35 +1,30 @@
 import { JSX } from 'react'
+import { formatUnits } from 'viem'
 
+import { CampaignWithMeta } from '@/app/hooks/useCampaigns'
 import Container from '@/app/ui/Container'
 import Typography from '@/app/ui/Typography'
+import { formatAmount, formatSmallNumber, fromWei } from '@/app/utils/format'
 
-export default function Label(): JSX.Element {
-	// Mock data - En producción vendrá del contrato Streamer.getCampaign()
-	const campaign = {
-		id: 1,
-		network: 'Sepolia',
-		name: 'SUNM Fair Launch',
-		pool: {
-			token0: 'SUNM',
-			token1: 'USDCM'
-		},
-		reward: {
-			token: 'USDTM', // Reward token (puede ser diferente al pool)
-			symbol: 'USDTMx' // SuperToken symbol
-		},
-		budget: 50000, // Budget en reward tokens
-		goal: 500000, // TVL goal en USD
-		duration: 30, // Días
-		flowRate: '1929012345679', // wei/segundo (calculado: budget/duration)
-		active: true,
-		totalUnits: 320000, // Liquidez actual
-		goalReached: false
-	}
+type Props = {
+	campaign: CampaignWithMeta
+}
 
-	const tvlProgress = Math.round((campaign.totalUnits / campaign.goal) * 100)
-	const estimatedAPY = Math.round(
-		(campaign.budget / campaign.totalUnits) * 365 * 100
-	)
+export default function Label(props: Props): JSX.Element {
+	const { campaign } = props
+
+	const feePercent = (campaign.pool.fee / 10000).toFixed(2)
+	const budgetUsd = parseFloat(formatUnits(campaign.budget, campaign.rewardDecimals))
+	const durationDays = Math.round(Number(campaign.duration) / 86400)
+
+	// Flow rate per second (Superfluid uses 18 decimals)
+	const flowRatePerSecond = fromWei(campaign.flowRate, 18)
+
+	// Calculate TVL in USD: tvlUsd = (totalUnits / goal) * budgetUsd
+	const totalUnits = Number(campaign.totalUnits)
+	const goal = Number(campaign.goal)
+	const tvlUsd = goal > 0 ? (totalUnits / goal) * budgetUsd : 0
+	const progress = goal > 0 ? Math.min(100, Math.round((totalUnits / goal) * 100)) : 0
 
 	return (
 		<Container className="flex flex-row items-start justify-between gap-6">
@@ -38,14 +33,14 @@ export default function Label(): JSX.Element {
 				{/* Chips */}
 				<div className="flex flex-row items-center gap-2">
 					<Container variant="rounded" className="w-fit px-3 py-1">
-						<Typography variant="label">{campaign.network}</Typography>
+						<Typography variant="label">Sepolia</Typography>
 					</Container>
 					<Container
 						variant="rounded"
 						className="w-fit px-3 py-1 border-dashed"
 					>
 						<Typography variant="label" className="text-gray-400">
-							ID #{campaign.id}
+							ID #{campaign.id.toString()}
 						</Typography>
 					</Container>
 					<Container
@@ -53,16 +48,16 @@ export default function Label(): JSX.Element {
 						className="w-fit px-3 py-1 border-dashed"
 					>
 						<Typography variant="label" className="text-gray-400">
-							Reward: {campaign.reward.token}
+							Reward: {campaign.rewardSymbol}
 						</Typography>
 					</Container>
 					{campaign.active && (
 						<Container
 							variant="rounded"
-							className="w-fit px-3 py-1 border-cyan-400/70 bg-cyan-400/10"
+							className="w-fit px-3 py-1 border-green-500/50 bg-green-500/10"
 						>
-							<Typography variant="label" className="text-cyan-300">
-								Streaming
+							<Typography variant="label" className="text-green-400">
+								● Live
 							</Typography>
 						</Container>
 					)}
@@ -70,56 +65,57 @@ export default function Label(): JSX.Element {
 
 				{/* Título */}
 				<Typography variant="title" className="text-xl">
-					{campaign.name}
+					{campaign.token0Symbol}/{campaign.token1Symbol} Campaign
 				</Typography>
 
-				{/* Subtítulo con info del contrato */}
+				{/* Subtítulo */}
 				<Typography variant="label" className="text-gray-400">
 					Pool:{' '}
 					<span className="text-white font-medium">
-						{campaign.pool.token0} / {campaign.pool.token1}
+						{campaign.token0Symbol} / {campaign.token1Symbol} ({feePercent}%)
 					</span>{' '}
-					• Duration: {campaign.duration} days • Budget:{' '}
-					{campaign.budget.toLocaleString()} {campaign.reward.token}
+					• Duration: {durationDays} days • Budget: ${formatAmount(budgetUsd)}
 				</Typography>
 
 				{/* Flow rate info */}
 				<Typography variant="label" className="text-gray-500 text-[10px]">
-					Flow rate: ~{(Number(campaign.flowRate) / 1e18).toFixed(6)}{' '}
-					{campaign.reward.symbol}
-					/sec
+					Flow rate: ~{formatSmallNumber(flowRatePerSecond)} {campaign.rewardSymbol}/sec
 				</Typography>
+
+				{/* Addresses */}
+				<div className="flex flex-row gap-4 text-[10px] text-gray-600">
+					<span>Token0: {campaign.pool.currency0.slice(0, 10)}...</span>
+					<span>Token1: {campaign.pool.currency1.slice(0, 10)}...</span>
+					<span>Reward: {campaign.reward.slice(0, 10)}...</span>
+				</div>
 			</div>
 
-			{/* KPIs */}
+			{/* KPIs - Values in USD */}
 			<div className="flex flex-row items-end gap-3">
 				<Container className="min-w-[110px] p-3">
 					<Typography variant="label" className="text-gray-400">
-						TVL (Units)
+						TVL
 					</Typography>
 					<Typography variant="subtitle" className="mt-1">
-						{campaign.totalUnits.toLocaleString()}
+						${formatAmount(tvlUsd)}
 					</Typography>
 				</Container>
 
 				<Container className="min-w-[110px] p-3">
 					<Typography variant="label" className="text-gray-400">
-						APY (est.)
+						Goal
 					</Typography>
-					<Typography variant="subtitle" className="mt-1 text-green-400">
-						{estimatedAPY}%
+					<Typography variant="subtitle" className="mt-1">
+						${formatAmount(budgetUsd)}
 					</Typography>
 				</Container>
 
 				<Container className="min-w-[110px] p-3">
 					<Typography variant="label" className="text-gray-400">
-						Goal progress
+						Progress
 					</Typography>
-					<Typography
-						variant="subtitle"
-						className={`mt-1 ${campaign.goalReached ? 'text-green-400' : ''}`}
-					>
-						{tvlProgress}%
+					<Typography variant="subtitle" className="mt-1">
+						{progress}%
 					</Typography>
 				</Container>
 			</div>

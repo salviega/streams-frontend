@@ -1,113 +1,91 @@
 'use client'
 
 import { JSX, useState } from 'react'
+import { formatUnits } from 'viem'
 
+import { useCampaigns, CampaignWithMeta } from '@/app/hooks/useCampaigns'
 import Container from '@/app/ui/Container'
 import Typography from '@/app/ui/Typography'
 
 import Pool from './_components/Pool'
 
-// Mock campaigns data - En producción vendrá del contrato Streamer
-const mockCampaigns = [
-	{
-		id: 1,
-		name: 'SUNM Fair Launch',
-		pool: { token0: 'SUNM', token1: 'USDCM', feeTier: 3000, price: 0.0245 },
-		reward: 'USDTM',
-		network: 'Sepolia',
-		status: 'live' as const,
-		totalUnits: 320000,
-		goal: 500000,
-		budget: 50000,
-		tvl: 125000,
-		daysRemaining: 25,
-		goalReached: false
-	},
-	{
-		id: 2,
-		name: 'ETH/USDC Rewards',
-		pool: { token0: 'WETH', token1: 'USDC', feeTier: 500, price: 3245.67 },
-		reward: 'ARB',
-		network: 'Sepolia',
-		status: 'live' as const,
-		totalUnits: 890000,
-		goal: 1000000,
-		budget: 100000,
-		tvl: 520000,
-		daysRemaining: 12,
-		goalReached: false
-	},
-	{
-		id: 3,
-		name: 'DAI Liquidity',
-		pool: { token0: 'DAI', token1: 'USDC', feeTier: 100, price: 0.9998 },
-		reward: 'COMP',
-		network: 'Sepolia',
-		status: 'funding' as const,
-		totalUnits: 150000,
-		goal: 500000,
-		budget: 25000,
-		tvl: 75000,
-		daysRemaining: 30,
-		goalReached: false
-	},
-	{
-		id: 4,
-		name: 'LINK Boost',
-		pool: { token0: 'LINK', token1: 'WETH', feeTier: 3000, price: 0.0042 },
-		reward: 'LINK',
-		network: 'Sepolia',
-		status: 'completed' as const,
-		totalUnits: 500000,
-		goal: 500000,
-		budget: 75000,
-		tvl: 310000,
-		daysRemaining: 0,
-		goalReached: true
-	},
-	{
-		id: 5,
-		name: 'UNI/WETH Pool',
-		pool: { token0: 'UNI', token1: 'WETH', feeTier: 3000, price: 0.0021 },
-		reward: 'UNI',
-		network: 'Sepolia',
-		status: 'live' as const,
-		totalUnits: 420000,
-		goal: 600000,
-		budget: 45000,
-		tvl: 180000,
-		daysRemaining: 18,
-		goalReached: false
-	}
-]
+type Props = {
+	onSelectCampaign?: (campaign: CampaignWithMeta) => void
+	selectedCampaignId?: number
+}
 
-export default function Campaigns(): JSX.Element {
-	const [selectedId, setSelectedId] = useState<number>(1)
+export default function Campaigns(props: Props): JSX.Element {
+	const { onSelectCampaign, selectedCampaignId } = props
+	const { campaigns, loading, error, refetch } = useCampaigns()
+
+	const [selectedId, setSelectedId] = useState<number>(selectedCampaignId || 1)
+
+	const handleSelectCampaign = (campaign: CampaignWithMeta) => {
+		setSelectedId(Number(campaign.id))
+		onSelectCampaign?.(campaign)
+	}
+
+	if (loading) {
+		return (
+			<Container className="h-full w-full flex flex-col gap-4 items-center justify-center">
+				<div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+				<Typography variant="label" className="text-gray-400">
+					Loading campaigns...
+				</Typography>
+			</Container>
+		)
+	}
+
+	if (error) {
+		return (
+			<Container className="h-full w-full flex flex-col gap-4 items-center justify-center">
+				<Typography variant="label" className="text-red-400">
+					{error}
+				</Typography>
+				<button
+					onClick={refetch}
+					className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 text-sm hover:bg-cyan-500/30"
+				>
+					Retry
+				</button>
+			</Container>
+		)
+	}
+
+	if (campaigns.length === 0) {
+		return (
+			<Container className="h-full w-full flex flex-col gap-4 items-center justify-center">
+				<Typography variant="label" className="text-gray-400">
+					No campaigns found
+				</Typography>
+				<Typography variant="label" className="text-gray-500 text-xs">
+					Create your first campaign to get started!
+				</Typography>
+			</Container>
+		)
+	}
 
 	return (
-		<div className="h-full flex flex-col items-center justify-start">
-			<Container className="h-full w-full flex flex-col gap-4">
-				<div className="flex flex-row items-center justify-between">
-					<Typography variant="title">Campaigns</Typography>
-					<Container variant="rounded" className="w-fit px-3 py-1">
-						<Typography variant="label">
-							{mockCampaigns.length} pools
-						</Typography>
-					</Container>
-				</div>
+		<Container className="h-full w-full flex flex-col gap-4">
+			<div className="w-full flex flex-row items-center justify-between">
+				<Typography variant="title">Campaigns</Typography>
+				<Container variant="rounded" className="w-fit px-3 py-1">
+					<Typography variant="label">{campaigns.length} pools</Typography>
+				</Container>
+			</div>
 
-				{/* Lista con scroll */}
-				<div className="h-full w-full flex flex-col gap-3 overflow-y-auto">
-					{mockCampaigns.map(campaign => (
+			<div className="flex-1 overflow-y-auto pr-1">
+				<div className="flex flex-col gap-3">
+					{campaigns.map(campaign => (
 						<Pool
-							key={campaign.id}
+							key={Number(campaign.id)}
 							campaign={campaign}
-							selected={campaign.id === selectedId}
-							onClick={() => setSelectedId(campaign.id)}
+							selected={Number(campaign.id) === selectedId}
+							onClick={() => handleSelectCampaign(campaign)}
 						/>
 					))}
 				</div>
-			</Container>
-		</div>
+			</div>
+		</Container>
 	)
 }

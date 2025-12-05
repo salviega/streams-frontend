@@ -4,10 +4,17 @@ import { sepolia } from 'viem/chains'
 // Re-export erc20Abi from viem
 export const erc20Abi = viemErc20Abi
 
-// Public client for Sepolia
+// Public RPC for Sepolia (no rate limiting)
+const SEPOLIA_RPC = 'https://ethereum-sepolia-rpc.publicnode.com'
+
+// Public client for Sepolia with public RPC
 export const sepoliaClient = createPublicClient({
 	chain: sepolia,
-	transport: http()
+	transport: http(SEPOLIA_RPC, {
+		retryCount: 3,
+		retryDelay: 1000,
+		timeout: 30_000
+	})
 })
 
 // Custom ERC20 ABI subset for compatibility
