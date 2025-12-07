@@ -13,8 +13,8 @@ import {
 export type PoolKey = {
 	currency0: Address
 	currency1: Address
-	fee: bigint
-	tickSpacing: bigint
+	fee: number
+	tickSpacing: number
 	hooks: Address
 }
 
@@ -250,8 +250,8 @@ export function buildCreateCampaignParams(
 	const poolKey: PoolKey = {
 		currency0,
 		currency1,
-		fee: BigInt(feeTier.fee),
-		tickSpacing: BigInt(tickSpacing),
+		fee: feeTier.fee,
+		tickSpacing: tickSpacing,
 		hooks: STREAMER_HOOK_ADDRESS
 	}
 
