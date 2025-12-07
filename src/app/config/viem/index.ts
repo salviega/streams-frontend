@@ -1,13 +1,15 @@
 import { createPublicClient, http, formatUnits, erc20Abi as viemErc20Abi } from 'viem'
 import { sepolia } from 'viem/chains'
 
+import { register } from '@/app/config/const/register'
+
 // Re-export erc20Abi from viem
 export const erc20Abi = viemErc20Abi
 
-// Public RPC for Sepolia (no rate limiting)
-const SEPOLIA_RPC = 'https://ethereum-sepolia-rpc.publicnode.com'
+// Private Alchemy RPC for Sepolia (higher rate limits)
+const SEPOLIA_RPC = register.alchemy.ethereumSepoliaRpcHttps
 
-// Public client for Sepolia with public RPC
+// Public client for Sepolia with Alchemy RPC
 export const sepoliaClient = createPublicClient({
 	chain: sepolia,
 	transport: http(SEPOLIA_RPC, {

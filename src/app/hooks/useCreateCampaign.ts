@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Address, encodeFunctionData, erc20Abi, Hex, maxUint256, parseUnits } from 'viem'
-import { useSendCalls, useWalletClient } from 'wagmi'
+import { useSendCalls, useCallsStatus } from 'wagmi'
 import { useActiveAccount } from 'thirdweb/react'
 
 import { STREAMER_ABI } from '@/app/abi/streamer.abi'
@@ -10,6 +10,14 @@ import { STREAMER_ADDRESS } from '@/app/config/const/contracts'
 import { sepoliaClient, erc20Abi as customErc20Abi } from '@/app/config/viem'
 import { TokenInfo, FeeTier } from '@/app/types/token'
 import { buildCreateCampaignParams } from '@/app/helpers/campaign-params.helper'
+
+type TxStatus =
+	| 'idle'
+	| 'preparing'
+	| 'waiting_wallet'
+	| 'pending'
+	| 'success'
+	| 'failed'
 
 export type CreateCampaignInput = {
 	token0: TokenInfo
@@ -33,11 +41,63 @@ export function useCreateCampaign() {
 	const account = useActiveAccount()
 	const userAddress = account?.address as Address | undefined
 
-	const { sendCallsAsync, isPending } = useSendCalls()
+	const { sendCallsAsync, isPending: isSending } = useSendCalls()
 
 	const [error, setError] = useState<string | null>(null)
 	const [txHash, setTxHash] = useState<string | null>(null)
+	const [batchId, setBatchId] = useState<string | null>(null)
+	const [txStatus, setTxStatus] = useState<TxStatus>('idle')
 	const [status, setStatus] = useState<string>('')
+
+	// Watch batch status
+	const { data: callsStatus } = useCallsStatus({
+		id: batchId as string,
+		query: {
+			enabled: !!batchId,
+			refetchInterval: data => {
+				const status = data.state.data?.status
+				if (status === 'success' || status === 'failure') return false
+				return 2000
+			}
+		}
+	})
+
+	// Derive transaction status from callsStatus
+	const derivedTxStatus: TxStatus = (() => {
+		if (!batchId) return txStatus
+		if (!callsStatus) return 'pending'
+		if (callsStatus.status === 'pending') return 'pending'
+		if (callsStatus.status === 'success') return 'success'
+		if (callsStatus.status === 'failure') return 'failed'
+		return txStatus
+	})()
+
+	// Get actual tx hash from receipts when confirmed
+	const actualTxHash =
+		callsStatus?.receipts?.[callsStatus.receipts.length - 1]?.transactionHash ??
+		txHash
+
+	// Derive status message
+	const derivedStatusMessage = (() => {
+		if (derivedTxStatus === 'pending')
+			return 'Transaction pending... Waiting for confirmation.'
+		if (derivedTxStatus === 'success') return 'Transaction confirmed!'
+		if (derivedTxStatus === 'failed') return ''
+		return status
+	})()
+
+	// Update txStatus when callsStatus changes
+	useEffect(() => {
+		if (callsStatus) {
+			if (callsStatus.status === 'success') {
+				setTxStatus('success')
+			} else if (callsStatus.status === 'failure') {
+				setTxStatus('failed')
+			} else if (callsStatus.status === 'pending') {
+				setTxStatus('pending')
+			}
+		}
+	}, [callsStatus, derivedTxStatus])
 
 	const fetchAllowances = useCallback(
 		async (
@@ -57,7 +117,6 @@ export function useCreateCampaign() {
 					})
 					allowanceMap.set(token.address.toLowerCase(), allowance)
 				} catch (e) {
-					console.warn(`Failed to fetch allowance for ${token.symbol}:`, e)
 					allowanceMap.set(token.address.toLowerCase(), 0n)
 				}
 			}
@@ -82,13 +141,8 @@ export function useCreateCampaign() {
 					allowanceMap.get(token.address.toLowerCase()) ?? 0n
 
 				if (currentAllowance >= amount) {
-					console.log(`✅ ${token.symbol} already approved`)
 					continue
 				}
-
-				console.log(
-					`📝 Need to approve ${token.symbol}: current=${currentAllowance}, needed=${amount}`
-				)
 
 				// If there's existing allowance, reset it first (for tokens like USDT)
 				if (currentAllowance > 0n) {
@@ -156,7 +210,16 @@ export function useCreateCampaign() {
 				// 3. Build approve calls
 				const approveCalls = buildApproveCalls(allTokens, amounts, allowanceMap)
 
-				// 4. Build campaign params
+				// 4. Get current campaign counter to calculate the new campaign ID
+				setStatus('Getting campaign counter...')
+				const currentCounter = await sepoliaClient.readContract({
+					address: STREAMER_ADDRESS,
+					abi: STREAMER_ABI,
+					functionName: 'getCampaignCounter'
+				})
+				const newCampaignId = currentCounter + 1n
+
+				// 5. Build campaign params
 				setStatus('Building campaign parameters...')
 				const campaignParams = buildCreateCampaignParams(
 					token0,
@@ -171,9 +234,7 @@ export function useCreateCampaign() {
 					userAddress
 				)
 
-				console.log('📦 Campaign params:', campaignParams)
-
-				// 5. Build createCampaign call
+				// 6. Build createCampaign call
 				const createCampaignCall: Call = {
 					to: STREAMER_ADDRESS,
 					data: encodeFunctionData({
@@ -183,27 +244,33 @@ export function useCreateCampaign() {
 					})
 				}
 
-				// 6. Combine all calls
-				const allCalls = [...approveCalls, createCampaignCall]
+				// 7. Build startCampaign call (will use the ID calculated above)
+				const startCampaignCall: Call = {
+					to: STREAMER_ADDRESS,
+					data: encodeFunctionData({
+						abi: STREAMER_ABI,
+						functionName: 'startCampaign',
+						args: [newCampaignId]
+					})
+				}
 
-				console.log('🔁 Total calls:', allCalls.length)
-				console.log('   Approve calls:', approveCalls.length)
-				console.log('   CreateCampaign call: 1')
+				// 8. Combine all calls: approves + createCampaign + startCampaign
+				const allCalls = [...approveCalls, createCampaignCall, startCampaignCall]
 
-				// 7. Send batch transaction
-				setStatus(`Sending ${allCalls.length} transactions...`)
+				// 9. Send batch transaction
+				setStatus('Please confirm in your wallet...')
+				setTxStatus('waiting_wallet')
 
-				const { id: batchId } = await sendCallsAsync({
+				const { id: newBatchId } = await sendCallsAsync({
 					calls: allCalls
 				})
 
-				console.log('🚀 Batch ID:', batchId)
-				setTxHash(batchId)
-				setStatus('Transaction sent! Waiting for confirmation...')
+				setBatchId(newBatchId)
+				setTxStatus('pending')
+				setStatus('Transaction submitted! Waiting for confirmation...')
 
-				return batchId
+				return newBatchId
 			} catch (err) {
-				console.error('❌ Error creating campaign:', err)
 				const errorMessage =
 					err instanceof Error ? err.message : 'Unknown error occurred'
 				setError(errorMessage)
@@ -214,11 +281,33 @@ export function useCreateCampaign() {
 		[userAddress, fetchAllowances, buildApproveCalls, sendCallsAsync]
 	)
 
+	// isPending when sending or waiting for confirmation
+	const isPending =
+		isSending ||
+		derivedTxStatus === 'preparing' ||
+		derivedTxStatus === 'waiting_wallet' ||
+		derivedTxStatus === 'pending'
+	// isSuccess when tx is confirmed
+	const isSuccess = derivedTxStatus === 'success'
+	// isFailed when tx failed
+	const isFailed = derivedTxStatus === 'failed'
+
 	return {
 		createCampaign,
 		isPending,
-		error,
-		txHash,
-		status
+		isSuccess,
+		isFailed,
+		error: isFailed ? 'Transaction failed' : error,
+		txHash: actualTxHash,
+		batchId,
+		status: derivedStatusMessage,
+		txStatus: derivedTxStatus,
+		reset: () => {
+			setError(null)
+			setTxHash(null)
+			setBatchId(null)
+			setStatus('')
+			setTxStatus('idle')
+		}
 	}
 }

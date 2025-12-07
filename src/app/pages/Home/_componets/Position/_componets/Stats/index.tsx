@@ -1,6 +1,6 @@
 'use client'
 
-import { JSX } from 'react'
+import { JSX, useState } from 'react'
 import { formatUnits } from 'viem'
 
 import { CampaignWithMeta, useLpPosition } from '@/app/hooks/useCampaigns'
@@ -10,13 +10,18 @@ import TokenAvatar, { TokenPair } from '@/app/ui/TokenAvatar'
 import Typography from '@/app/ui/Typography'
 import { formatCompact, formatAmount, formatPercent, fromWei } from '@/app/utils/format'
 
+import AddLiquidityModal from '../AddLiquidityModal'
+
 type Props = {
 	campaign: CampaignWithMeta
+	onPositionChange?: () => void
 }
 
 export default function Stats(props: Props): JSX.Element {
-	const { campaign } = props
-	const { position, loading } = useLpPosition(Number(campaign.id))
+	const { campaign, onPositionChange } = props
+	const { position, loading, refetch: refetchPosition } = useLpPosition(Number(campaign.id))
+	
+	const [isAddLiquidityOpen, setIsAddLiquidityOpen] = useState(false)
 	
 	// Get user's LP units for the position amounts calculation
 	const userLpUnits = position?.lpUnits ?? 0n
@@ -44,9 +49,19 @@ export default function Stats(props: Props): JSX.Element {
 	const sharePercent = shareBps / 100
 	
 	// Pending reward - SuperToken always uses 18 decimals
-	const pendingReward = position
+	// getLpPendingReward returns realtimeBalanceOfNow, so this should be the actual balance
+	const pendingReward = position && position.pendingReward
 		? parseFloat(formatUnits(position.pendingReward, 18))
 		: 0
+	
+	// Debug log to see what we're getting
+	if (position) {
+		console.log(`[Stats] Campaign ${campaign.id} - pendingReward from contract:`, {
+			raw: position.pendingReward.toString(),
+			formatted: pendingReward,
+			hasPosition: !!position
+		})
+	}
 
 	const hasPosition = lpUnits > 0
 
@@ -234,10 +249,24 @@ export default function Stats(props: Props): JSX.Element {
 						<Typography variant="label" className="text-gray-500 text-xs">
 							Your share updates when you modify liquidity. Rewards claimable anytime.
 						</Typography>
-						<button className="px-4 py-2 rounded-xl border border-gray-600 bg-slate-900/80 text-sm hover:bg-slate-800 transition-colors whitespace-nowrap">
+						<button 
+							onClick={() => setIsAddLiquidityOpen(true)}
+							className="px-4 py-2 rounded-xl border border-gray-600 bg-slate-900/80 text-sm hover:bg-slate-800 transition-colors whitespace-nowrap"
+						>
 							+ Add liquidity
 						</button>
 					</div>
+
+					{/* Add Liquidity Modal */}
+					<AddLiquidityModal
+						isOpen={isAddLiquidityOpen}
+						onClose={() => setIsAddLiquidityOpen(false)}
+						campaign={campaign}
+						onSuccess={() => {
+							refetchPosition()
+							onPositionChange?.()
+						}}
+					/>
 				</>
 			) : (
 				<div className="flex flex-col gap-4">
@@ -258,9 +287,23 @@ export default function Stats(props: Props): JSX.Element {
 							4. Claim rewards anytime or let them accumulate
 						</Typography>
 					</div>
-					<button className="w-fit px-4 py-2 rounded-xl border border-cyan-500 bg-cyan-500/10 text-cyan-400 text-sm hover:bg-cyan-500/20 transition-colors">
+					<button 
+						onClick={() => setIsAddLiquidityOpen(true)}
+						className="w-fit px-4 py-2 rounded-xl border border-cyan-500 bg-cyan-500/10 text-cyan-400 text-sm hover:bg-cyan-500/20 transition-colors"
+					>
 						+ Add liquidity to earn
 					</button>
+
+					{/* Add Liquidity Modal */}
+					<AddLiquidityModal
+						isOpen={isAddLiquidityOpen}
+						onClose={() => setIsAddLiquidityOpen(false)}
+						campaign={campaign}
+						onSuccess={() => {
+							refetchPosition()
+							onPositionChange?.()
+						}}
+					/>
 				</div>
 			)}
 		</Container>

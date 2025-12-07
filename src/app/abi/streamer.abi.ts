@@ -53,6 +53,32 @@ export const STREAMER_ABI = [
 		type: 'function'
 	},
 
+	// Add liquidity to existing campaign
+	{
+		inputs: [
+			{ internalType: 'uint256', name: '_campaignId', type: 'uint256' },
+			{ internalType: 'int24', name: '_tickLower', type: 'int24' },
+			{ internalType: 'int24', name: '_tickUpper', type: 'int24' },
+			{ internalType: 'uint256', name: '_liquidity', type: 'uint256' },
+			{ internalType: 'uint256', name: '_amount0Max', type: 'uint256' },
+			{ internalType: 'uint256', name: '_amount1Max', type: 'uint256' },
+			{ internalType: 'uint256', name: '_deadline', type: 'uint256' }
+		],
+		name: 'addLiquidityToCampaign',
+		outputs: [],
+		stateMutability: 'payable',
+		type: 'function'
+	},
+
+	// Start campaign
+	{
+		inputs: [{ internalType: 'uint256', name: '_campaignId', type: 'uint256' }],
+		name: 'startCampaign',
+		outputs: [],
+		stateMutability: 'nonpayable',
+		type: 'function'
+	},
+
 	// ============= Getter Functions =============
 	{
 		inputs: [],

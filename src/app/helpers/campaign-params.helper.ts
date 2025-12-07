@@ -74,14 +74,6 @@ export function getTickLowerAndUpper(
 	const tickLower = usableTick - spread
 	const tickUpper = usableTick + spread
 
-	console.log('🎯 Tick Calculation:')
-	console.log(`   Price: ${price}`)
-	console.log(`   Current Tick: ${currentTick}`)
-	console.log(`   Usable Tick: ${usableTick}`)
-	console.log(`   Spread: ${spread}`)
-	console.log(`   Tick Lower: ${tickLower}`)
-	console.log(`   Tick Upper: ${tickUpper}`)
-
 	if (tickLower < -887270 || tickUpper > 887270) {
 		throw new Error(
 			`Tick out of range: ${tickLower} < -887270 or ${tickUpper} > 887270`
@@ -144,12 +136,6 @@ export function getLiquidity(
 	)
 
 	const liquidity = getLiquidityForAmount0(sqrtPriceAX96, sqrtPriceBX96, amount0)
-	
-	console.log('💧 Liquidity Calculation:')
-	console.log(`   sqrtPriceAX96: ${sqrtPriceAX96.toString()}`)
-	console.log(`   sqrtPriceBX96: ${sqrtPriceBX96.toString()}`)
-	console.log(`   amount0: ${amount0.toString()}`)
-	console.log(`   liquidity: ${liquidity.toString()}`)
 
 	return liquidity
 }
@@ -194,19 +180,6 @@ export function buildCreateCampaignParams(
 	durationDays: number,
 	recipient: Address
 ): CreateCampaignParams {
-	console.log('\n🔧 ========== BUILD CAMPAIGN PARAMS ==========')
-	console.log('\n📥 INPUT:')
-	console.log(`   Token0: ${token0.symbol} (${token0.address}) decimals=${token0.decimals}`)
-	console.log(`   Token1: ${token1.symbol} (${token1.address}) decimals=${token1.decimals}`)
-	console.log(`   Fee Tier: ${feeTier.label} (fee=${feeTier.fee}, tickSpacing=${feeTier.tickSpacing})`)
-	console.log(`   Initial Price: ${initialPrice}`)
-	console.log(`   Amount0: ${amount0}`)
-	console.log(`   Amount1: ${amount1}`)
-	console.log(`   Reward Token: ${rewardToken.symbol} (${rewardToken.address}) decimals=${rewardToken.decimals}`)
-	console.log(`   Reward Amount: ${rewardAmount}`)
-	console.log(`   Duration Days: ${durationDays}`)
-	console.log(`   Recipient: ${recipient}`)
-
 	// Sort tokens (currency0 < currency1) - CRITICAL!
 	const [sortedToken0, sortedToken1, isSwapped] =
 		token0.address.toLowerCase() < token1.address.toLowerCase()
@@ -215,12 +188,6 @@ export function buildCreateCampaignParams(
 
 	const currency0 = sortedToken0.address as Address
 	const currency1 = sortedToken1.address as Address
-
-	console.log('\n🔀 SORTED TOKENS:')
-	console.log(`   isSwapped: ${isSwapped}`)
-	console.log(`   currency0: ${sortedToken0.symbol} (${currency0})`)
-	console.log(`   currency1: ${sortedToken1.symbol} (${currency1})`)
-	console.log(`   Verification: currency0 < currency1 = ${currency0.toLowerCase() < currency1.toLowerCase()}`)
 
 	// Parse amounts (SWAP IF NEEDED!)
 	const amount0Parsed = parseUnits(
@@ -232,13 +199,8 @@ export function buildCreateCampaignParams(
 		sortedToken1.decimals
 	)
 
-	console.log('\n💰 AMOUNTS (after swap adjustment):')
-	console.log(`   amount0Max (${sortedToken0.symbol}): ${amount0Parsed.toString()}`)
-	console.log(`   amount1Max (${sortedToken1.symbol}): ${amount1Parsed.toString()}`)
-
 	// Parse budget
 	const budget = parseUnits(rewardAmount, rewardToken.decimals)
-	console.log(`   budget (${rewardToken.symbol}): ${budget.toString()}`)
 
 	// Calculate price: MUST NORMALIZE BY DECIMALS!
 	// price = (amount1 / 10^decimals1) / (amount0 / 10^decimals0)
@@ -246,13 +208,6 @@ export function buildCreateCampaignParams(
 	const amount0Normalized = Number(amount0Parsed) / Math.pow(10, sortedToken0.decimals)
 	const amount1Normalized = Number(amount1Parsed) / Math.pow(10, sortedToken1.decimals)
 	const price = amount1Normalized / amount0Normalized
-
-	console.log('\n📈 PRICE:')
-	console.log(`   Input initialPrice: ${initialPrice}`)
-	console.log(`   amount0Normalized: ${amount0Normalized} ${sortedToken0.symbol}`)
-	console.log(`   amount1Normalized: ${amount1Normalized} ${sortedToken1.symbol}`)
-	console.log(`   Calculated price (normalized): ${price}`)
-	console.log(`   This means: 1 ${sortedToken0.symbol} = ${price} ${sortedToken1.symbol}`)
 
 	// Get tick spacing from fee tier
 	const tickSpacing = feeTier.tickSpacing
@@ -265,12 +220,6 @@ export function buildCreateCampaignParams(
 	if (spread < tickSpacing * 10) {
 		spread = tickSpacing * 300 // A reasonable spread for most cases
 	}
-
-	console.log('\n📏 TICK CONFIG:')
-	console.log(`   tickSpacing: ${tickSpacing}`)
-	console.log(`   baseSpread: ${baseSpread}`)
-	console.log(`   adjusted spread: ${spread}`)
-	console.log(`   spread % tickSpacing = ${spread % tickSpacing} (must be 0)`)
 
 	// Calculate ticks
 	const { tickLower, tickUpper } = getTickLowerAndUpper(price, tickSpacing, spread)
@@ -288,8 +237,6 @@ export function buildCreateCampaignParams(
 		tickUpper
 	)
 
-	console.log(`   goal: ${goal.toString()}`)
-
 	// Duration in seconds
 	const duration = BigInt(durationDays * 24 * 60 * 60)
 
@@ -299,11 +246,6 @@ export function buildCreateCampaignParams(
 	// Starting price
 	const startingPrice = encodeSqrtPriceX96(price)
 
-	console.log('\n⏱️ TIME:')
-	console.log(`   duration: ${duration.toString()} seconds (${durationDays} days)`)
-	console.log(`   deadline: ${deadline.toString()}`)
-	console.log(`   startingPrice (sqrtPriceX96): ${startingPrice.toString()}`)
-
 	// Pool Key
 	const poolKey: PoolKey = {
 		currency0,
@@ -312,13 +254,6 @@ export function buildCreateCampaignParams(
 		tickSpacing: BigInt(tickSpacing),
 		hooks: STREAMER_HOOK_ADDRESS
 	}
-
-	console.log('\n🏊 POOL KEY:')
-	console.log(`   currency0: ${poolKey.currency0}`)
-	console.log(`   currency1: ${poolKey.currency1}`)
-	console.log(`   fee: ${poolKey.fee.toString()}`)
-	console.log(`   tickSpacing: ${poolKey.tickSpacing.toString()}`)
-	console.log(`   hooks: ${poolKey.hooks}`)
 
 	// Mint Position Params
 	const mintParams: MintPositionParams = {
@@ -331,15 +266,6 @@ export function buildCreateCampaignParams(
 		hookData: '0x'
 	}
 
-	console.log('\n🎫 MINT PARAMS:')
-	console.log(`   tickLower: ${mintParams.tickLower}`)
-	console.log(`   tickUpper: ${mintParams.tickUpper}`)
-	console.log(`   liquidity: ${mintParams.liquidity.toString()}`)
-	console.log(`   amount0Max: ${mintParams.amount0Max.toString()}`)
-	console.log(`   amount1Max: ${mintParams.amount1Max.toString()}`)
-	console.log(`   recipient: ${mintParams.recipient}`)
-	console.log(`   hookData: ${mintParams.hookData}`)
-
 	const result: CreateCampaignParams = {
 		pool: poolKey,
 		reward: rewardToken.address as Address,
@@ -351,34 +277,6 @@ export function buildCreateCampaignParams(
 		startingPrice,
 		mintParams
 	}
-
-	console.log('\n📦 FINAL CREATE CAMPAIGN PARAMS:')
-	console.log(JSON.stringify({
-		pool: {
-			currency0: result.pool.currency0,
-			currency1: result.pool.currency1,
-			fee: result.pool.fee.toString(),
-			tickSpacing: result.pool.tickSpacing.toString(),
-			hooks: result.pool.hooks
-		},
-		reward: result.reward,
-		budget: result.budget.toString(),
-		goal: result.goal.toString(),
-		duration: result.duration.toString(),
-		deadline: result.deadline.toString(),
-		rewardType: result.rewardType,
-		startingPrice: result.startingPrice.toString(),
-		mintParams: {
-			tickLower: result.mintParams.tickLower,
-			tickUpper: result.mintParams.tickUpper,
-			liquidity: result.mintParams.liquidity.toString(),
-			amount0Max: result.mintParams.amount0Max.toString(),
-			amount1Max: result.mintParams.amount1Max.toString(),
-			recipient: result.mintParams.recipient,
-			hookData: result.mintParams.hookData
-		}
-	}, null, 2))
-	console.log('\n🔧 ========== END BUILD CAMPAIGN PARAMS ==========\n')
 
 	return result
 }

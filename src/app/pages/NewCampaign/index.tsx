@@ -1,6 +1,6 @@
 'use client'
 
-import { JSX, useState, useCallback } from 'react'
+import { JSX, useState, useCallback, useEffect } from 'react'
 
 import Modal from '@/app/ui/Modal'
 import Button from '@/app/ui/Button'
@@ -41,22 +41,46 @@ export default function NewCampaign(props: Props): JSX.Element {
 
 	const [currentStep, setCurrentStep] = useState(1)
 	const [formData, setFormData] = useState<CampaignFormData>(initialFormData)
-	const [txSuccess, setTxSuccess] = useState(false)
+	const [showSuccess, setShowSuccess] = useState(false)
+	const [confirmedTxHash, setConfirmedTxHash] = useState<string | null>(null)
 
-	const { createCampaign, isPending, error, txHash, status } = useCreateCampaign()
+	const { 
+		createCampaign, 
+		isPending, 
+		isSuccess, 
+		isFailed,
+		error, 
+		txHash, 
+		batchId,
+		status, 
+		txStatus,
+		reset 
+	} = useCreateCampaign()
+
+	// Handle success - store values locally
+	useEffect(() => {
+		if (isSuccess && !showSuccess) {
+			setShowSuccess(true)
+			setConfirmedTxHash(txHash)
+		}
+	}, [isSuccess, showSuccess, txHash])
 
 	const handleClose = useCallback(() => {
 		setCurrentStep(1)
 		setFormData(initialFormData)
-		setTxSuccess(false)
+		setShowSuccess(false)
+		setConfirmedTxHash(null)
+		reset()
 		onClose()
-	}, [onClose])
+	}, [onClose, reset])
 
 	const handleReset = useCallback(() => {
 		setCurrentStep(1)
 		setFormData(initialFormData)
-		setTxSuccess(false)
-	}, [])
+		setShowSuccess(false)
+		setConfirmedTxHash(null)
+		reset()
+	}, [reset])
 
 	// Step 1 handlers
 	const handleToken0Change = (token: TokenInfo) => {
@@ -108,7 +132,7 @@ export default function NewCampaign(props: Props): JSX.Element {
 		}
 
 		try {
-			const batchId = await createCampaign({
+			await createCampaign({
 				token0: formData.token0,
 				token1: formData.token1,
 				feeTier: formData.feeTier,
@@ -119,16 +143,9 @@ export default function NewCampaign(props: Props): JSX.Element {
 				rewardAmount: formData.rewardAmount,
 				durationDays: formData.duration
 			})
-
-			if (batchId) {
-				setTxSuccess(true)
-				// Close after a delay to show success
-				setTimeout(() => {
-					handleClose()
-				}, 3000)
-			}
+			// Success will be handled by useEffect watching isSuccess
 		} catch (err) {
-			console.error('Error creating campaign:', err)
+			// Error handled by hook
 		}
 	}
 
@@ -186,33 +203,63 @@ export default function NewCampaign(props: Props): JSX.Element {
 				</div>
 			</div>
 
-			{/* Success State */}
-			{txSuccess && (
+			{/* Success State - shows when tx is confirmed */}
+			{showSuccess && (
 				<div className="flex flex-col items-center justify-center gap-4 py-12">
-					<div className="h-16 w-16 rounded-full bg-green-500/20 flex items-center justify-center">
-						<span className="text-4xl">🎉</span>
+					<div className="relative">
+						<div className="h-20 w-20 rounded-full bg-green-500/20 flex items-center justify-center">
+							<span className="text-5xl">🎉</span>
+						</div>
+						<div className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-green-500 flex items-center justify-center">
+							<svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+								<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+							</svg>
+						</div>
 					</div>
-					<Typography variant="title" className="text-green-400">
-						Campaign Created!
+					<Typography variant="title" className="text-green-400 text-xl">
+						Campaign Created Successfully!
 					</Typography>
 					<Typography variant="label" className="text-gray-400 text-center">
-						Your campaign has been submitted to the blockchain.
-						{txHash && (
-							<span className="block mt-2 font-mono text-xs text-cyan-400">
-								Batch ID: {txHash}
-							</span>
+						Your campaign has been created and activated on the blockchain.
+						{(confirmedTxHash || txHash) && (
+							<div className="mt-4 flex flex-col gap-2">
+								<div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-gray-700">
+									<Typography variant="label" className="text-gray-400 text-xs">
+										Transaction Hash
+									</Typography>
+									<Typography variant="label" className="text-cyan-400 font-mono text-xs">
+										{(confirmedTxHash || txHash)?.slice(0, 8)}...{(confirmedTxHash || txHash)?.slice(-6)}
+									</Typography>
+								</div>
+								<a
+									href={`https://sepolia.etherscan.io/tx/${confirmedTxHash || txHash}`}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="flex items-center justify-center gap-2 p-3 rounded-xl border border-cyan-500/50 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+								>
+									<span>View on Etherscan</span>
+									<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+										<path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+									</svg>
+								</a>
+							</div>
 						)}
 					</Typography>
+					<Button variant="secondary" size="md" className="w-full mt-4" onClick={handleClose}>
+						Close
+					</Button>
 				</div>
 			)}
 
-			{/* Status State */}
-			{status && isPending && (
+			{/* Status State - show pending while waiting for confirmation */}
+			{!showSuccess && (status || isPending) && (
 				<div className="mb-4 p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
 					<div className="flex items-center gap-3">
-						<div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+						{isPending && (
+							<div className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+						)}
 						<Typography variant="label" className="text-cyan-400">
-							{status}
+							{status || (txStatus === 'pending' ? 'Transaction pending... Waiting for confirmation.' : 'Processing...')}
 						</Typography>
 					</div>
 				</div>
@@ -228,7 +275,7 @@ export default function NewCampaign(props: Props): JSX.Element {
 			)}
 
 			{/* Main Content */}
-			{!txSuccess && (
+			{!showSuccess && (
 				<div className="flex gap-8">
 					{/* Left Sidebar - Step Indicator */}
 					<div className="w-64 flex-shrink-0">

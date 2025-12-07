@@ -124,7 +124,7 @@ export default function TokenSelectModal(props: Props): JSX.Element {
 
 						balance = formatBalance(balanceRaw, Number(decimals))
 					} catch (e) {
-						console.warn('Could not fetch balance:', e)
+						// Silently fail - balance will remain 0
 					}
 				}
 
@@ -139,7 +139,6 @@ export default function TokenSelectModal(props: Props): JSX.Element {
 
 				setFoundToken(token)
 			} catch (err) {
-				console.error('Error fetching token:', err)
 				setError(
 					'Could not fetch token information. Make sure this is a valid ERC-20 on Sepolia.'
 				)

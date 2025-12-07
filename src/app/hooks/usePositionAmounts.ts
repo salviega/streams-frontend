@@ -74,7 +74,6 @@ export function usePositionAmounts(
 			})
 			setError(null)
 		} catch (err) {
-			console.error('Error fetching position amounts:', err)
 			setError('Failed to fetch position amounts')
 			setAmounts(null)
 		} finally {

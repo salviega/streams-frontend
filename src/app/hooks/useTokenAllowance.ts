@@ -24,7 +24,6 @@ export function useTokenAllowance() {
 				})
 				return allowance
 			} catch (error) {
-				console.error('Error fetching allowance:', error)
 				return 0n
 			}
 		},
@@ -56,7 +55,7 @@ export function useTokenAllowance() {
 					allowanceMap.set(address.toLowerCase(), allowance)
 				})
 			} catch (error) {
-				console.error('Error fetching allowances:', error)
+				// Silently fail
 			} finally {
 				setIsLoading(false)
 			}

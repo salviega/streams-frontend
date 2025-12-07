@@ -1,6 +1,6 @@
 'use client'
 
-import { JSX, useEffect, useState } from 'react'
+import { JSX, useEffect, useState, useCallback, useRef } from 'react'
 
 import Typography from '@/app/ui/Typography'
 import Button from '@/app/ui/Button'
@@ -63,6 +63,9 @@ export default function Step2(props: Props): JSX.Element {
 		'token1'
 	)
 
+	// Track which input is being edited to prevent infinite loops
+	const editingRef = useRef<'token0' | 'token1' | 'price' | null>(null)
+
 	// Suggest price for stablecoin pairs
 	useEffect(() => {
 		if (!initialPrice) {
@@ -72,6 +75,119 @@ export default function Step2(props: Props): JSX.Element {
 			}
 		}
 	}, [token0.symbol, token1.symbol, initialPrice, onInitialPriceChange])
+
+	// Get the actual price value based on direction
+	const getPriceValue = useCallback((): number => {
+		if (!initialPrice) return 0
+		const priceNum = parseFloat(initialPrice)
+		if (isNaN(priceNum) || priceNum <= 0) return 0
+		// Price is always: 1 token0 = X token1
+		// If direction is token1, price is direct
+		// If direction is token0, price is inverted
+		return priceDirection === 'token1' ? priceNum : 1 / priceNum
+	}, [initialPrice, priceDirection])
+
+	// Auto-calculate amount1 from amount0 based on price
+	const calculateAmount1FromAmount0 = useCallback((amt0: string, price: number): string => {
+		if (!amt0 || price <= 0) return ''
+		const num = parseFloat(amt0)
+		if (isNaN(num) || num <= 0) return ''
+		const calculated = num * price
+		return calculated.toFixed(6)
+	}, [])
+
+	// Auto-calculate amount0 from amount1 based on price
+	const calculateAmount0FromAmount1 = useCallback((amt1: string, price: number): string => {
+		if (!amt1 || price <= 0) return ''
+		const num = parseFloat(amt1)
+		if (isNaN(num) || num <= 0) return ''
+		const calculated = num / price
+		return calculated.toFixed(6)
+	}, [])
+
+	// Track last price to detect changes
+	const lastPriceRef = useRef<number>(0)
+
+	// Handle price change - recalculate amounts if one is already set
+	// Only recalculate when price actually changes, not when amounts change
+	useEffect(() => {
+		// Skip if we're currently editing price (handled by handleInitialPriceChange)
+		if (editingRef.current === 'price') {
+			editingRef.current = null
+			return
+		}
+
+		const price = getPriceValue()
+		
+		// Only recalculate if price actually changed
+		if (price <= 0 || price === lastPriceRef.current) {
+			lastPriceRef.current = price
+			return
+		}
+
+		lastPriceRef.current = price
+
+		// If amount0 is set, recalculate amount1
+		if (amount0 && editingRef.current !== 'token0' && editingRef.current !== 'token1') {
+			editingRef.current = 'price'
+			const calculated = calculateAmount1FromAmount0(amount0, price)
+			if (calculated && calculated !== amount1) {
+				onAmount1Change(calculated)
+			}
+			setTimeout(() => { editingRef.current = null }, 0)
+		}
+		// If amount1 is set, recalculate amount0
+		else if (amount1 && editingRef.current !== 'token0' && editingRef.current !== 'token1') {
+			editingRef.current = 'price'
+			const calculated = calculateAmount0FromAmount1(amount1, price)
+			if (calculated && calculated !== amount0) {
+				onAmount0Change(calculated)
+			}
+			setTimeout(() => { editingRef.current = null }, 0)
+		}
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [initialPrice, priceDirection]) // Only depend on price, not amounts
+
+	// Handle amount0 change (auto-calculate amount1)
+	const handleAmount0Change = useCallback((value: string) => {
+		editingRef.current = 'token0'
+		onAmount0Change(value)
+		const price = getPriceValue()
+		if (value && price > 0) {
+			const calculatedAmount1 = calculateAmount1FromAmount0(value, price)
+			// Only update if different to avoid loops
+			if (calculatedAmount1 && calculatedAmount1 !== amount1) {
+				onAmount1Change(calculatedAmount1)
+			}
+		} else if (!value) {
+			onAmount1Change('')
+		}
+		setTimeout(() => { editingRef.current = null }, 0)
+	}, [getPriceValue, calculateAmount1FromAmount0, onAmount0Change, onAmount1Change, amount1])
+
+	// Handle amount1 change (auto-calculate amount0)
+	const handleAmount1Change = useCallback((value: string) => {
+		editingRef.current = 'token1'
+		onAmount1Change(value)
+		const price = getPriceValue()
+		if (value && price > 0) {
+			const calculatedAmount0 = calculateAmount0FromAmount1(value, price)
+			// Only update if different to avoid loops
+			if (calculatedAmount0 && calculatedAmount0 !== amount0) {
+				onAmount0Change(calculatedAmount0)
+			}
+		} else if (!value) {
+			onAmount0Change('')
+		}
+		setTimeout(() => { editingRef.current = null }, 0)
+	}, [getPriceValue, calculateAmount0FromAmount1, onAmount0Change, onAmount1Change, amount0])
+
+	// Handle price change
+	const handleInitialPriceChange = useCallback((value: string) => {
+		editingRef.current = 'price'
+		onInitialPriceChange(value)
+		setTimeout(() => { editingRef.current = null }, 0)
+	}, [onInitialPriceChange])
 
 	// Check if both are stablecoins
 	const bothStablecoins = isStablecoin(token0.symbol) && isStablecoin(token1.symbol)
@@ -186,7 +302,7 @@ export default function Step2(props: Props): JSX.Element {
 							onChange={e => {
 								const val = e.target.value
 								if (val === '' || /^\d*\.?\d*$/.test(val)) {
-									onInitialPriceChange(val)
+									handleInitialPriceChange(val)
 								}
 							}}
 							className="flex-1 text-2xl bg-transparent border-none outline-none text-white"
@@ -260,14 +376,14 @@ export default function Step2(props: Props): JSX.Element {
 				<DepositInput
 					token={token0}
 					value={amount0}
-					onChange={onAmount0Change}
+					onChange={handleAmount0Change}
 				/>
 
 				{/* Token 1 Input */}
 				<DepositInput
 					token={token1}
 					value={amount1}
-					onChange={onAmount1Change}
+					onChange={handleAmount1Change}
 				/>
 			</div>
 

@@ -64,7 +64,6 @@ export function useCampaignCounter() {
 			setCounter(Number(result))
 			setError(null)
 		} catch (err) {
-			console.error('Error fetching campaign counter:', err)
 			setError('Failed to fetch campaign counter')
 		} finally {
 			setLoading(false)
@@ -172,7 +171,6 @@ export function useCampaign(campaignId: number) {
 			setCampaign(campaignWithMeta)
 			setError(null)
 		} catch (err) {
-			console.error('Error fetching campaign:', err)
 			setError('Failed to fetch campaign')
 		} finally {
 			setLoading(false)
@@ -224,7 +222,6 @@ export function useCampaigns() {
 			setCampaigns(validCampaigns)
 			setError(null)
 		} catch (err) {
-			console.error('Error fetching campaigns:', err)
 			setError('Failed to fetch campaigns')
 		} finally {
 			setLoading(false)
@@ -283,6 +280,11 @@ export function useLpPosition(campaignId: number) {
 				})
 			])
 
+			console.log(`[useLpPosition] Campaign ${campaignId} - User: ${userAddress}`)
+			console.log(`  lpUnits: ${lpUnits.toString()}`)
+			console.log(`  shareBps: ${shareBps.toString()}`)
+			console.log(`  pendingReward: ${pendingReward.toString()} (${Number(pendingReward) / 1e18} tokens)`)
+
 			setPosition({
 				lpUnits: lpUnits as bigint,
 				shareBps: shareBps as bigint,
@@ -290,7 +292,6 @@ export function useLpPosition(campaignId: number) {
 			})
 			setError(null)
 		} catch (err) {
-			console.error('Error fetching LP position:', err)
 			setError('Failed to fetch LP position')
 		} finally {
 			setLoading(false)
@@ -384,7 +385,6 @@ async function fetchSingleCampaign(campaignId: number): Promise<CampaignWithMeta
 			rewardDecimals: rewardDecimals as number
 		}
 	} catch (err) {
-		console.error(`Error fetching campaign ${campaignId}:`, err)
 		return null
 	}
 }

@@ -1,6 +1,9 @@
 import { ensureEnvVar } from '@/app/helpers/ensure-env-var.helper'
 
 interface Register {
+	alchemy: {
+		ethereumSepoliaRpcHttps: string
+	}
 	thirdweb: {
 		clientId: string
 		clientSecret: string
@@ -8,6 +11,12 @@ interface Register {
 }
 
 export const register: Register = {
+	alchemy: {
+		ethereumSepoliaRpcHttps: ensureEnvVar(
+			process.env.NEXT_PUBLIC_ETHEREUM_SEPOLIA_RPC_HTTPS,
+			'ETHEREUM_SEPOLIA_RPC_HTTPS'
+		)
+	},
 	thirdweb: {
 		clientId: ensureEnvVar(
 			process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID,
