@@ -48,6 +48,50 @@ streams/
 - Detects changes in pool liquidity
 - Notifies the Streamer contract to update LP units
 
+### How the Hook Works
+
+The **StreamerHook** is a critical component that enables automatic tracking of liquidity changes in Uniswap V4 pools. Here's how it operates:
+
+#### Hook Permissions
+
+The hook is configured with the following permissions:
+
+- `afterAddLiquidity: true` - Executes after liquidity is added
+- `afterRemoveLiquidity: true` - Executes after liquidity is removed
+- All other hooks are disabled for gas efficiency
+
+#### Hook Execution Flow
+
+1. **When LP adds liquidity:**
+   - Uniswap V4 PositionManager calls the pool's `modifyLiquidity` function
+   - After the liquidity is added, `_afterAddLiquidity` hook is triggered
+   - The hook extracts the `campaignId` by looking up the pool key
+   - If a campaign exists for this pool, it calls `streamer.addUnitsToLP()`
+   - The LP's address is extracted from `hookData` (passed during liquidity addition)
+
+2. **When LP removes liquidity:**
+   - Similar flow but triggered by `_afterRemoveLiquidity`
+   - Calls `streamer.removeUnitsFromLP()` to update the LP's units
+   - Proportions are automatically recalculated
+
+#### Hook Data
+
+The hook uses `hookData` to identify the actual LP address:
+
+```solidity
+// When adding liquidity, the LP address is encoded in hookData
+bytes memory hookData = abi.encode(msg.sender);
+```
+
+This allows the hook to correctly attribute liquidity changes to the right LP, even when called through intermediate contracts.
+
+#### Integration with Campaigns
+
+- Each campaign is associated with a specific Uniswap V4 pool
+- The hook maintains a mapping: `PoolId → CampaignId`
+- Only pools with active campaigns trigger unit updates
+- This ensures gas efficiency by only processing relevant liquidity events
+
 #### 3. **StreamerConfig.sol** (Configuration)
 
 - Manages protocol parameters (fees, treasury, etc.)
@@ -340,6 +384,21 @@ MIT License - see LICENSE file for details
 ## 📧 Support
 
 For questions and support, open an issue in the repository.
+
+## 🚀 Future Plans & Support Needed
+
+Our next goal is to move from this hackathon demo to a more solid MVP that can be tested in real environments. To do that, we're looking for a small amount of funding—ideally through a grant—to strengthen the hook infrastructure, improve security, and deliver a beta version ready for pilot programs.
+
+We'd also appreciate support in connecting with protocols that are preparing token launches and want to experiment with liquidity incentive campaigns on our platform. Running pilots with real projects would help us validate the experience, improve usability, and ensure the product solves real needs in the ecosystem.
+
+If you're interested in:
+
+- **Providing funding or grants** for development
+- **Partnering** for pilot programs with your token launch
+- **Contributing** to the codebase or documentation
+- **Providing feedback** on the protocol design
+
+Please reach out by opening an issue or contacting us directly.
 
 ---
 
