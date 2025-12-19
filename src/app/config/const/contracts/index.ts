@@ -2,10 +2,10 @@ import { Address } from 'viem'
 
 // Sepolia Contract Addresses
 export const STREAMER_ADDRESS: Address =
-	'0xd4Fd52dC24249Ba44B31277a981A2035B5aB5B32'
+	'0x396E30C3C6228BC525FbD66B00fcc90d545fA635'
 
 export const STREAMER_HOOK_ADDRESS: Address =
-	'0xc6DEa35aFCEfABaa145Ff5b298fDCFaF03Bc4500'
+	'0x433974E0e9f9f09Aac484Ecd6309a5976ff00500'
 
 // Superfluid Addresses (Sepolia)
 export const GDA_FORWARDER_ADDRESS: Address =
